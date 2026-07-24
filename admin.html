@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel — Licenças</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: #0a0d12; color: #fff; padding: 20px;
+    }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .sub { color: #949bad; font-size: 13px; margin-bottom: 20px; }
+    .resumo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 22px; }
+    .cartao { background: #12151d; border-radius: 12px; padding: 14px; text-align: center; }
+    .cartao .num { font-size: 22px; font-weight: 700; }
+    .cartao .lbl { font-size: 11.5px; color: #949bad; margin-top: 2px; }
+    input#busca {
+        width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #222633;
+        background: #12151d; color: white; margin-bottom: 14px; font-size: 14px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: #949bad; font-weight: 600; padding: 8px 6px; border-bottom: 1px solid #222633; white-space: nowrap; }
+    td { padding: 10px 6px; border-bottom: 1px solid #1a1e29; vertical-align: top; }
+    .tag { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .tag-pago { background: rgba(35,133,52,0.2); color: #4ade80; }
+    .tag-trial { background: rgba(230,119,0,0.2); color: #fbbf24; }
+    .tag-expirado { background: rgba(220,38,38,0.2); color: #f87171; }
+    .tag-custom { background: rgba(124,58,237,0.25); color: #c4b5fd; margin-left: 4px; }
+    .tag-alerta-ip { background: rgba(220,38,38,0.22); color: #fca5a5; margin-left: 4px; }
+    .aviso-banco {
+        display: none; background: rgba(220,38,38,0.15); border: 1px solid #dc2626; color: #fca5a5;
+        border-radius: 10px; padding: 12px 14px; font-size: 12.5px; margin-bottom: 16px; line-height: 1.5;
+    }
+    .acoes button {
+        padding: 6px 10px; border-radius: 8px; border: none; font-size: 11.5px;
+        font-weight: 600; cursor: pointer; margin: 2px 3px 2px 0; white-space: nowrap;
+    }
+    .btn-liberar { background: #238534; color: white; }
+    .btn-bloquear { background: #dc2626; color: white; }
+    .btn-desbloquear { background: #333a4a; color: white; }
+    .btn-config { background: #1d63b8; color: white; }
+    .btn-historico { background: #333a4a; color: white; }
+    .device-id { font-size: 10.5px; color: #626b80; word-break: break-all; }
+    #carregando, #erro { color: #949bad; padding: 20px 0; }
+    #erro { color: #f87171; }
+    .wrap-tabela { overflow-x: auto; }
+
+    .overlay {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+        align-items: center; justify-content: center; z-index: 100; padding: 16px;
+    }
+    .modal {
+        background: #12151d; border-radius: 14px; padding: 20px; width: 100%; max-width: 380px;
+        max-height: 85vh; overflow-y: auto;
+    }
+    .modal h3 { margin-top: 0; font-size: 16px; }
+    .modal label { display: block; font-size: 12px; color: #949bad; margin: 12px 0 4px; }
+    .modal input {
+        width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #222633;
+        background: #0a0d12; color: white; font-size: 14px;
+    }
+    .modal .dica { font-size: 11px; color: #626b80; margin-top: 3px; }
+    .modal-botoes { display: flex; gap: 8px; margin-top: 18px; }
+    .modal-botoes button { flex: 1; padding: 11px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; }
+    .btn-salvar-modal { background: #238534; color: white; }
+    .btn-fechar-modal { background: #262b38; color: white; }
+    .linha-hist { border-bottom: 1px solid #1a1e29; padding: 10px 0; font-size: 12.5px; }
+    .linha-hist .status-approved { color: #4ade80; }
+    .linha-hist .status-pending { color: #fbbf24; }
+</style>
+</head>
+<body>
+    <h1>📋 Painel de Licenças</h1>
+    <p class="sub">Clientes que instalaram o app, status do teste/pagamento, e liberação manual (Pix na mão, dinheiro, etc.)</p>
+
+    <div class="aviso-banco" id="avisoBancoDesconectado">
+        ⚠️ <strong>UPSTASH_REDIS_REST_URL/TOKEN não configurados no servidor.</strong> Sem isso, os dados de licença não persistem — somem quando o serviço reiniciar. Configure essas duas variáveis de ambiente no Render (veja o README) e reimplante.
+    </div>
+
+    <div class="resumo" id="resumo"></div>
+
+    <input id="busca" type="text" placeholder="Buscar por nome, telefone ou ID do aparelho...">
+
+    <div id="carregando">Carregando...</div>
+    <div id="erro" style="display:none"></div>
+    <div class="wrap-tabela">
+        <table id="tabela" style="display:none">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>Status</th>
+                    <th>Dias</th>
+                    <th>Criado em</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela"></tbody>
+        </table>
+    </div>
+
+    <!-- Modal: configurar preço/prazos individuais -->
+    <div class="overlay" id="overlayConfig">
+        <div class="modal">
+            <h3>⚙️ Configuração individual</h3>
+            <p class="dica" id="nomeClienteConfig"></p>
+
+            <label>Dias de teste grátis</label>
+            <input type="number" id="inputDiasTeste" placeholder="Padrão do sistema">
+            <p class="dica">Deixe em branco pra usar o padrão geral configurado no servidor.</p>
+
+            <label>Dias de validade após pagar</label>
+            <input type="number" id="inputDiasValidade" placeholder="Padrão do sistema">
+            <p class="dica">Por quantos dias a licença fica ativa depois de cada pagamento confirmado.</p>
+
+            <label>Preço da licença (R$)</label>
+            <input type="number" step="0.01" id="inputPreco" placeholder="Padrão do sistema">
+            <p class="dica">Valor cobrado quando esse cliente gerar um novo Pix pelo app.</p>
+
+            <div class="modal-botoes">
+                <button class="btn-fechar-modal" onclick="fecharModais()">Cancelar</button>
+                <button class="btn-salvar-modal" onclick="salvarConfig()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: histórico de pagamentos -->
+    <div class="overlay" id="overlayHistorico">
+        <div class="modal">
+            <h3>🧾 Histórico de pagamentos</h3>
+            <p class="dica" id="nomeClienteHistorico"></p>
+            <div id="listaHistorico"></div>
+            <div class="modal-botoes">
+                <button class="btn-fechar-modal" onclick="fecharModais()" style="width:100%">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let TODAS = [];
+    let deviceIdSelecionado = null;
+
+    function formatarData(iso) {
+        if(!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    }
+
+    function tagStatus(l) {
+        let base;
+        if(l.status === 'pago') base = `<span class="tag tag-pago">✅ Pago (${l.dias_restantes}d)</span>`;
+        else if(l.status === 'trial') base = `<span class="tag tag-trial">🕐 Teste (${l.dias_restantes}d)</span>`;
+        else base = `<span class="tag tag-expirado">🔒 ${l.bloqueado ? 'Bloqueado' : 'Expirado'}</span>`;
+        const temCustom = l.dias_teste_customizado != null || l.dias_validade_customizado != null || l.preco_customizado != null;
+        let extras = temCustom ? '<span class="tag tag-custom">personalizado</span>' : '';
+        if(l.mesmo_ip_outros > 0) {
+            extras += `<span class="tag tag-alerta-ip" title="Outro(s) ${l.mesmo_ip_outros} cliente(s) já criaram licença nesse mesmo IP — pode ser reinstalação pra resetar o teste">⚠️ mesmo IP (${l.mesmo_ip_outros})</span>`;
+        }
+        return base + extras;
+    }
+
+    function renderizar(lista) {
+        const corpo = document.getElementById('corpoTabela');
+        corpo.innerHTML = lista.map(l => `
+            <tr>
+                <td>
+                    <div><strong>${l.nome || '(sem nome)'}</strong></div>
+                    <div style="color:#949bad">${l.telefone || ''}</div>
+                    <div class="device-id">${l.device_id}</div>
+                </td>
+                <td>${tagStatus(l)}</td>
+                <td>${l.status === 'expirado' ? '—' : l.dias_restantes}</td>
+                <td>${formatarData(l.criado_em)}</td>
+                <td class="acoes">
+                    <button class="btn-liberar" onclick="liberar('${l.device_id}')">Liberar (pago)</button>
+                    ${l.bloqueado
+                        ? `<button class="btn-desbloquear" onclick="desbloquear('${l.device_id}')">Desbloquear</button>`
+                        : `<button class="btn-bloquear" onclick="bloquear('${l.device_id}')">Bloquear</button>`
+                    }
+                    <button class="btn-config" onclick="abrirConfig('${l.device_id}')">Config</button>
+                    <button class="btn-historico" onclick="abrirHistorico('${l.device_id}')">Histórico</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function carregar() {
+        try {
+            const resp = await fetch('/api/admin/licencas');
+            if(!resp.ok) throw new Error('Erro ' + resp.status);
+            const dados = await resp.json();
+            TODAS = dados.licencas;
+            if(dados.banco_conectado === false) {
+                document.getElementById('avisoBancoDesconectado').style.display = 'block';
+            }
+            document.getElementById('resumo').innerHTML = `
+                <div class="cartao"><div class="num">${dados.resumo.total}</div><div class="lbl">Total de clientes</div></div>
+                <div class="cartao"><div class="num" style="color:#4ade80">${dados.resumo.pagos}</div><div class="lbl">Pagos</div></div>
+                <div class="cartao"><div class="num" style="color:#fbbf24">${dados.resumo.em_teste}</div><div class="lbl">Em teste</div></div>
+                <div class="cartao"><div class="num" style="color:#f87171">${dados.resumo.expirados}</div><div class="lbl">Expirados</div></div>
+            `;
+            renderizar(TODAS);
+            document.getElementById('carregando').style.display = 'none';
+            document.getElementById('tabela').style.display = 'table';
+        } catch (e) {
+            document.getElementById('carregando').style.display = 'none';
+            document.getElementById('erro').style.display = 'block';
+            document.getElementById('erro').textContent = 'Erro ao carregar: ' + e.message;
+        }
+    }
+
+    async function liberar(deviceId) {
+        if(!confirm('Confirmar liberação manual (marcar como pago) para este cliente?')) return;
+        await fetch(`/api/admin/licencas/${deviceId}/liberar`, { method: 'POST' });
+        carregar();
+    }
+    async function bloquear(deviceId) {
+        if(!confirm('Bloquear o acesso deste cliente agora?')) return;
+        await fetch(`/api/admin/licencas/${deviceId}/bloquear`, { method: 'POST' });
+        carregar();
+    }
+    async function desbloquear(deviceId) {
+        await fetch(`/api/admin/licencas/${deviceId}/desbloquear`, { method: 'POST' });
+        carregar();
+    }
+
+    function fecharModais() {
+        document.getElementById('overlayConfig').style.display = 'none';
+        document.getElementById('overlayHistorico').style.display = 'none';
+        deviceIdSelecionado = null;
+    }
+
+    function abrirConfig(deviceId) {
+        const cliente = TODAS.find(l => l.device_id === deviceId);
+        if(!cliente) return;
+        deviceIdSelecionado = deviceId;
+        document.getElementById('nomeClienteConfig').textContent = cliente.nome || cliente.device_id;
+        document.getElementById('inputDiasTeste').value = cliente.dias_teste_customizado ?? '';
+        document.getElementById('inputDiasValidade').value = cliente.dias_validade_customizado ?? '';
+        document.getElementById('inputPreco').value = cliente.preco_customizado ?? '';
+        document.getElementById('overlayConfig').style.display = 'flex';
+    }
+
+    async function salvarConfig() {
+        if(!deviceIdSelecionado) return;
+        const dias_teste = document.getElementById('inputDiasTeste').value;
+        const dias_validade = document.getElementById('inputDiasValidade').value;
+        const preco = document.getElementById('inputPreco').value;
+        await fetch(`/api/admin/licencas/${deviceIdSelecionado}/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dias_teste, dias_validade, preco })
+        });
+        fecharModais();
+        carregar();
+    }
+
+    function abrirHistorico(deviceId) {
+        const cliente = TODAS.find(l => l.device_id === deviceId);
+        if(!cliente) return;
+        document.getElementById('nomeClienteHistorico').textContent = cliente.nome || cliente.device_id;
+        const historico = cliente.historico_pagamentos || [];
+        const lista = document.getElementById('listaHistorico');
+        if(historico.length === 0) {
+            lista.innerHTML = '<p class="dica">Nenhum pagamento gerado ainda pra esse cliente.</p>';
+        } else {
+            lista.innerHTML = [...historico].reverse().map(h => `
+                <div class="linha-hist">
+                    <div><strong>${h.valor != null ? 'R$ ' + Number(h.valor).toFixed(2).replace('.', ',') : '—'}</strong>
+                        · <span class="status-${h.status}">${h.status === 'approved' ? 'Aprovado' : 'Pendente'}</span></div>
+                    <div class="dica">Gerado: ${formatarData(h.criado_em)}</div>
+                    ${h.aprovado_em ? `<div class="dica">Aprovado: ${formatarData(h.aprovado_em)}</div>` : ''}
+                    <div class="dica">${h.metodo || 'pix'} · ID: ${h.payment_id}</div>
+                </div>
+            `).join('');
+        }
+        document.getElementById('overlayHistorico').style.display = 'flex';
+    }
+
+    document.getElementById('busca').addEventListener('input', (e) => {
+        const termo = e.target.value.toLowerCase();
+        renderizar(TODAS.filter(l =>
+            (l.nome || '').toLowerCase().includes(termo) ||
+            (l.telefone || '').toLowerCase().includes(termo) ||
+            l.device_id.toLowerCase().includes(termo)
+        ));
+    });
+
+    carregar();
+    setInterval(carregar, 30000); // atualiza sozinho a cada 30s
+</script>
+</body>
+</html>
