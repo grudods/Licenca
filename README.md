@@ -122,10 +122,14 @@ você configurou no passo 4.
 Lá você vê:
 - **Quantos clientes** tem no total, quantos pagaram, quantos estão em teste, quantos expiraram.
 - **Nome e WhatsApp** de cada um (informado na primeira abertura do app dele).
+- **Coluna "Sem acessar"** — quantos dias faz desde a última vez que o app desse cliente falou com o servidor. Verde = acessou recentemente, amarelo = começando a sumir, vermelho = sumiu de vez. É esse dado que resolve a bagunça: agora dá pra saber quem realmente ainda usa o app.
+- **Abas Todos / 🟢 Ativos / ⚪ Inativos** — filtram a lista por quem acessou nos últimos 3 dias ou não. Além disso, a lista já vem ordenada com quem pagou e está ativo no topo, e quem só testou e sumiu no final — não fica mais enterrado.
 - Botão **"Liberar (pago)"** — usa quando o cliente pagou em mão/dinheiro/fora do Pix automático. Libera a licença por mais `DIAS_VALIDADE_LICENCA` dias na hora.
 - Botão **"Bloquear"** — corta o acesso na hora (ex.: pagamento estornado, chargeback, ou qualquer suspeita). Some com o botão e vira **"Desbloquear"**.
 - Botão **"Config"** — define preço, dias de teste e dias de validade **diferentes do padrão só pra aquele cliente** (ex.: dar um desconto, um teste maior, ou uma cortesia). Deixe os campos em branco pra voltar a usar o padrão geral.
 - Botão **"Histórico"** — mostra todas as cobranças já geradas pra aquele cliente (Pix automático e liberações manuais), com valor, status e datas.
+- Botão **"Apagar"** — remove aquele cliente definitivamente do painel. Não pode ser desfeito.
+- Botão **"🧹 Limpar quem sumiu"** — apaga de uma vez todos os clientes que **nunca pagaram** e não abrem o app há X dias (você escolhe o número). Quem já pagou alguma vez **nunca** é apagado por essa limpeza, mesmo inativo — ela só remove teste "morto" que ficou passando pra frente na lista à toa.
 - Tag **"⚠️ mesmo IP"** — aparece quando outro cliente já criou uma licença usando a mesma internet (Wi-Fi/dados) que esse. Não bloqueia sozinho (duas pessoas podem legitimamente estar na mesma casa/rede), mas é um indício de reinstalação pra resetar o teste — vale olhar o histórico e nome/telefone antes de decidir bloquear.
 
 A lista atualiza sozinha a cada 30 segundos.
